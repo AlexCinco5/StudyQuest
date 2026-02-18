@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../entities/level_entity.dart';
 import '../entities/flashcard_entity.dart';
+import '../entities/quiz_entity.dart'; // <--- NUEVO IMPORT
 
 class LevelRepository {
   final SupabaseClient supabase;
@@ -8,10 +9,9 @@ class LevelRepository {
   LevelRepository(this.supabase);
 
   /// Obtiene la lista de niveles disponibles para un documento específico.
-  /// Verifica en la base de datos si existen flashcards o quizzes generados.
   Future<List<LevelEntity>> getLevelsForDocument(String docId) async {
     try {
-      // 1. Verificar si hay Flashcards (Consultamos solo 1 para saber si existen)
+      // 1. Verificar si hay Flashcards
       final flashcardsData = await supabase
           .from('flashcards')
           .select('id')
@@ -28,54 +28,63 @@ class LevelRepository {
       List<LevelEntity> levels = [];
 
       // --- NIVEL 1: CONCEPTOS CLAVE (Flashcards) ---
-      // Si existen flashcards en la DB, agregamos este nivel al mapa
       if (flashcardsData.isNotEmpty) {
         levels.add(const LevelEntity(
           id: 'lvl_1_flash',
           title: 'Conceptos Clave',
           type: LevelType.flashcards,
-          isLocked: false, // El primer nivel siempre está desbloqueado
+          isLocked: false, 
           difficulty: 1,
         ));
       }
 
       // --- NIVEL 2: PRUEBA DE CONOCIMIENTO (Quiz) ---
-      // Si existen quizzes en la DB, agregamos este nivel
       if (quizzesData.isNotEmpty) {
         levels.add(const LevelEntity(
           id: 'lvl_2_quiz',
           title: 'Prueba de Conocimiento',
           type: LevelType.quiz,
-          isLocked: false, // Por ahora desbloqueado para pruebas (luego lo bloquearemos hasta pasar el nivel 1)
+          isLocked: false, // Puedes cambiar esto a true si quieres obligar a pasar el nivel 1 primero
           difficulty: 2,
         ));
       }
 
-      // En el futuro aquí podrías agregar lógica para 'Exámenes Finales', 'Retos', etc.
-
       return levels;
 
     } catch (e) {
-      // Si hay error (ej: sin conexión), lanzamos la excepción para que el Bloc la maneje
       throw Exception('Error al cargar niveles: $e');
     }
   }
 
-  /// Obtiene todas las flashcards de un documento para empezar a jugar.
+  /// Obtiene todas las flashcards de un documento.
   Future<List<FlashcardEntity>> getFlashcards(String docId) async {
     try {
       final response = await supabase
           .from('flashcards')
-          .select() // Trae todas las columnas (id, front_text, back_text, etc.)
+          .select()
           .eq('document_id', docId);
 
-      // Convertimos la lista de mapas JSON (List<Map<String, dynamic>>) a objetos FlashcardEntity
       final List<dynamic> data = response as List<dynamic>;
-      
       return data.map((json) => FlashcardEntity.fromMap(json)).toList();
 
     } catch (e) {
       throw Exception('Error al obtener las flashcards: $e');
+    }
+  }
+
+  /// Obtiene todas las preguntas del Quiz para un documento.
+  /// (NUEVO MÉTODO)
+  Future<List<QuizEntity>> getQuizzes(String docId) async {
+    try {
+      final response = await supabase
+          .from('quizzes')
+          .select()
+          .eq('document_id', docId);
+
+      final List<dynamic> data = response as List<dynamic>;
+      return data.map((json) => QuizEntity.fromMap(json)).toList();
+    } catch (e) {
+      throw Exception('Error al obtener los quizzes: $e');
     }
   }
 }

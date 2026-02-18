@@ -4,10 +4,11 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/level_entity.dart';
 import '../bloc/level_bloc.dart';
-import 'flashcards_page.dart'; // <--- IMPORTANTE: Importamos la pantalla de juego
+import 'flashcards_page.dart'; 
+import 'quiz_page.dart'; // <--- NUEVO IMPORT
 
 class LevelMapPage extends StatelessWidget {
-  final String documentId; // Necesitamos el ID para buscar en DB
+  final String documentId;
   final String worldTitle;
   final Color worldColor;
 
@@ -52,7 +53,7 @@ class LevelMapPage extends StatelessWidget {
                   ),
                 );
               } else if (state is LevelLoaded) {
-                return _buildPath(context, state.levels); // Pasamos context para navegar
+                return _buildPath(context, state.levels);
               }
               return const SizedBox.shrink();
             },
@@ -82,7 +83,7 @@ class LevelMapPage extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 40),
-      itemCount: levels.length + 1, // +1 para la meta final (Cofre)
+      itemCount: levels.length + 1, // +1 para la meta final
       itemBuilder: (context, index) {
         if (index == levels.length) {
           // Meta Final (Cofre)
@@ -109,24 +110,22 @@ class LevelMapPage extends StatelessWidget {
     );
   }
 
-  // Nodo del Nivel mejorado
   Widget _buildLevelNode({
     required BuildContext context,
     required LevelEntity level,
     required Color color,
     required bool isLeft,
   }) {
-    // Icono según tipo de nivel
     IconData icon;
     switch (level.type) {
       case LevelType.flashcards:
-        icon = Icons.style; // Cartas
+        icon = Icons.style;
         break;
       case LevelType.quiz:
-        icon = Icons.quiz; // Preguntas
+        icon = Icons.quiz;
         break;
       case LevelType.exam:
-        icon = Icons.history_edu; // Examen
+        icon = Icons.history_edu;
         break;
       default:
         icon = Icons.star;
@@ -158,10 +157,11 @@ class LevelMapPage extends StatelessWidget {
                             ),
                           );
                         } else if (level.type == LevelType.quiz) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("🚧 Modo Quiz: ¡Próximamente! 🚧"),
-                              backgroundColor: Colors.orange,
+                          // --- AQUÍ CONECTAMOS EL QUIZ ---
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => QuizPage(documentId: documentId),
                             ),
                           );
                         }
