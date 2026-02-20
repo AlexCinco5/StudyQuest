@@ -4,6 +4,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/flashcard_entity.dart';
 import '../../domain/repositories/level_repository.dart';
+import '../../../auth/domain/repositories/auth_repository.dart';
 
 class FlashcardsPage extends StatefulWidget {
   final String documentId;
@@ -76,19 +77,36 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
   }
 
   void _showCompletionDialog() {
+    // 1. Sumar XP en segundo plano
+    di.sl<AuthRepository>().addXp(10); 
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: const Text("¡Nivel Completado! 🎉"),
-        content: const Text("Has repasado todos los conceptos clave."),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Has repasado todos los conceptos clave."),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.bolt, color: Colors.orange),
+                SizedBox(width: 8),
+                Text("+10 XP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange)),
+              ],
+            )
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Cierra diálogo
-              Navigator.pop(context); // Vuelve al mapa
+              Navigator.pop(context); 
+              Navigator.pop(context); 
             },
-            child: const Text("Continuar"),
+            child: const Text("Genial"),
           ),
         ],
       ),

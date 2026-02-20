@@ -7,6 +7,7 @@ abstract class AuthRemoteDataSource {
   Future<UserModel> loginWithEmail(String email, String password);
   Future<UserModel> registerWithEmail(String email, String password, String username);
   Future<void> logout();
+  Future<void> addXp(int amount); // <--- NUEVO
 }
 
 // Implementación Real
@@ -60,5 +61,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> logout() async {
     await supabaseClient.auth.signOut();
+  }
+  
+  @override
+  Future<void> addXp(int amount) async {
+    await supabaseClient.rpc('add_xp', params: {'amount': amount});
   }
 }

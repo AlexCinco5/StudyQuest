@@ -3,7 +3,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/quiz_entity.dart';
 import '../../domain/repositories/level_repository.dart';
-
+import '../../../auth/domain/repositories/auth_repository.dart';
 class QuizPage extends StatefulWidget {
   final String documentId;
 
@@ -67,19 +67,36 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   void _showCompletionDialog() {
+    // 2. Sumar XP (Más puntos por ser Quiz)
+    di.sl<AuthRepository>().addXp(20);
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         title: const Text("¡Examen Completado! 🎓"),
-        content: const Text("Has demostrado tu conocimiento."),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Has demostrado tu conocimiento."),
+            const SizedBox(height: 16),
+             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.bolt, color: Colors.orange),
+                SizedBox(width: 8),
+                Text("+20 XP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange)),
+              ],
+            )
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Cierra diálogo
-              Navigator.pop(context); // Vuelve al mapa
+              Navigator.pop(context); 
+              Navigator.pop(context); 
             },
-            child: const Text("Finalizar"),
+            child: const Text("Reclamar Recompensa"),
           ),
         ],
       ),

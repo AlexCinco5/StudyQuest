@@ -8,6 +8,8 @@ abstract class AuthRepository {
   // Future porque es asíncrono.
   // Either<Failure, UserEntity> significa:
   // "Esto va a devolver O una Falla (izquierda) O un Usuario (derecha)"
+  // Agrega esto dentro de la clase abstracta
+  Future<void> addXp(int amount);
   
   Future<Either<Failure, UserEntity>> loginWithEmail({
     required String email,

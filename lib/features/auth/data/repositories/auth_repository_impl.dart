@@ -48,4 +48,15 @@ class AuthRepositoryImpl implements AuthRepository {
       // En logout a veces no importa tanto si falla, pero podríamos manejarlo
     }
   }
+
+  // Al final de la clase, implementa el método
+  @override
+  Future<void> addXp(int amount) async {
+    try {
+      await remoteDataSource.addXp(amount);
+    } catch (e) {
+      print("Error sumando XP: $e");
+      // No lanzamos error para no interrumpir la UI de "Felicidades"
+    }
+  }
 }
