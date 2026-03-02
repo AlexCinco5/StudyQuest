@@ -19,15 +19,33 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> getCurrentProfile() async {
     final user = supabaseClient.auth.currentUser;
-    if (user == null) throw Exception("No hay sesión");
+    if (user == null) throw Exception("No hay sesión activa");
 
-    final response = await supabaseClient
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .single(); 
-
-    return response;
+    try {
+      // 1. Intentamos buscar el perfil normalmente
+      final response = await supabaseClient
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .single(); 
+          
+      return response;
+    } catch (e) {
+      // 2. Si falla (error porque no existe), LO CREAMOS EN ESE INSTANTE
+      print("Perfil no encontrado, creando uno nuevo para el usuario...");
+      
+      final newProfile = await supabaseClient
+          .from('profiles')
+          .insert({
+            'id': user.id,
+            'total_xp': 0,
+            'current_streak': 0,
+          })
+          .select()
+          .single(); // Pedimos que nos devuelva el perfil recién creado
+          
+      return newProfile;
+    }
   }
   
   @override
