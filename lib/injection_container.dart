@@ -7,13 +7,13 @@ import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 
-// --- IMPORTS DE HOME (Documentos) ---
+//  IMPORTS DE HOME
 import 'features/home/data/datasources/home_remote_data_source.dart';
 import 'features/home/data/repositories/home_repository_impl.dart';
 import 'features/home/domain/repositories/home_repository.dart';
 import 'features/home/presentation/bloc/home_bloc.dart';
 
-// --- IMPORTS DE LEVELS (Nuevos) ---
+// IMPORTS DE NIVELES 
 // Asegúrate de haber creado estos archivos previamente
 import 'features/home/domain/repositories/level_repository.dart'; 
 import 'features/home/presentation/bloc/level_bloc.dart';
@@ -21,7 +21,7 @@ import 'features/home/presentation/bloc/level_bloc.dart';
 final sl = GetIt.instance; // Service Locator
 
 Future<void> init() async {
-  // ! --- Features - Auth ---
+  // Features - Auth 
   sl.registerFactory(() => AuthBloc(authRepository: sl()));
   sl.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(remoteDataSource: sl()),
@@ -30,7 +30,7 @@ Future<void> init() async {
     () => AuthRemoteDataSourceImpl(supabaseClient: sl()),
   );
 
-  // ! --- Features - Home (Lista de Mundos/Documentos) ---
+  // Features - Home (Lista de Mundos/Documentos)
   sl.registerFactory(() => HomeBloc(homeRepository: sl()));
   sl.registerLazySingleton<HomeRepository>(
     () => HomeRepositoryImpl(remoteDataSource: sl()),
@@ -39,7 +39,7 @@ Future<void> init() async {
     () => HomeRemoteDataSourceImpl(supabaseClient: sl()),
   );
 
-  // ! --- Features - Levels (Mapa de Niveles) ---
+  // Features - Levels / Mapa de Niveles
   // Registramos el Bloc que controla el mapa
   sl.registerFactory(() => LevelBloc(sl()));
   
@@ -47,6 +47,6 @@ Future<void> init() async {
   // Nota: LevelRepository depende directamente de SupabaseClient
   sl.registerLazySingleton(() => LevelRepository(sl()));
 
-  // ! --- External (Cliente Supabase) ---
+  // External (Cliente Supabase) 
   sl.registerLazySingleton(() => Supabase.instance.client);
 }

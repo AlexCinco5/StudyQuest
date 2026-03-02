@@ -12,7 +12,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   AuthBloc({required this.authRepository}) : super(AuthInitial()) {
     
-    // --- MANEJO DE LOGIN ---
+    // MANEJO DE LOGIN 
     on<LoginRequested>((event, emit) async {
       // 1. Emitimos estado de carga
       emit(AuthLoading());
@@ -30,7 +30,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
     });
 
-    // --- MANEJO DE REGISTRO (Nuevo) ---
+    // MANEJO DE REGISTRO
     on<RegisterRequested>((event, emit) async {
       // 1. Emitimos estado de carga
       emit(AuthLoading());

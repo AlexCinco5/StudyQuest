@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart'; // Importante: Para usar Either
 import '../../../../core/errors/failures.dart';
 import '../entities/user_entity.dart';
+import '../entities/profile_entity.dart';
 
 // Abstract class = Contrato
 abstract class AuthRepository {
@@ -9,6 +10,8 @@ abstract class AuthRepository {
   // Either<Failure, UserEntity> significa:
   // "Esto va a devolver O una Falla (izquierda) O un Usuario (derecha)"
   // Agrega esto dentro de la clase abstracta
+  Future<Either<Failure, ProfileEntity>> getCurrentProfile();
+
   Future<void> addXp(int amount);
   
   Future<Either<Failure, UserEntity>> loginWithEmail({

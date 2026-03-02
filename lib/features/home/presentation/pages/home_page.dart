@@ -13,7 +13,6 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Inyectamos el HomeBloc e iniciamos la carga de documentos
     return BlocProvider(
       create: (_) => di.sl<HomeBloc>()..add(LoadDocuments()),
       child: const _HomeView(),
@@ -30,9 +29,7 @@ class _HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<_HomeView> {
   
-  // Lógica para seleccionar y subir archivo
   Future<void> _pickAndUploadFile(BuildContext context) async {
-    // Selector de archivos
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
@@ -43,10 +40,8 @@ class _HomeViewState extends State<_HomeView> {
       final fileName = result.files.single.name;
 
       if (context.mounted) {
-        // Disparamos el evento al BLoC
         context.read<HomeBloc>().add(UploadDocumentRequested(file, fileName));
         
-        // Feedback inmediato visual
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Subiendo '$fileName'..."),
@@ -56,7 +51,6 @@ class _HomeViewState extends State<_HomeView> {
         );
       }
     } else {
-      // Caso Web o cancelación
       if (result != null && result.files.single.path == null) {
          print("Error: El path del archivo es nulo (¿Estás en Web?)");
       }
@@ -67,20 +61,37 @@ class _HomeViewState extends State<_HomeView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text("Mis Mundos", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: false,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: Colors.black, // Color del texto
-        actions: [
-          _buildStatBadge(Icons.local_fire_department, "3", Colors.orange),
-          _buildStatBadge(Icons.diamond, "450", Colors.blueAccent),
-          const SizedBox(width: 16),
-        ],
+      
+      // --- APPBAR ACTUALIZADO CON BLOCBUILDER ---
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: BlocBuilder<HomeBloc, HomeState>(
+          builder: (context, state) {
+            String xpDisplay = "0";
+            String streakDisplay = "0";
+
+            if (state is HomeLoaded && state.profile != null) {
+              xpDisplay = state.profile.totalXp.toString();
+              streakDisplay = state.profile.currentStreak.toString();
+            }
+
+            return AppBar(
+              title: const Text("Mis Mundos", style: TextStyle(fontWeight: FontWeight.bold)),
+              centerTitle: false,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              foregroundColor: Colors.black,
+              actions: [
+                _buildStatBadge(Icons.local_fire_department, streakDisplay, Colors.orange),
+                _buildStatBadge(Icons.diamond, xpDisplay, Colors.blueAccent),
+                const SizedBox(width: 16),
+              ],
+            );
+          },
+        ),
       ),
       
-      // BlocConsumer escucha cambios de estado (Carga, Éxito, Error)
+      // --- EL RESTO QUEDA EXACTAMENTE IGUAL ---
       body: BlocConsumer<HomeBloc, HomeState>(
         listener: (context, state) {
           if (state is HomeError) {
@@ -88,7 +99,7 @@ class _HomeViewState extends State<_HomeView> {
               SnackBar(content: Text(state.message), backgroundColor: Colors.red),
             );
           } else if (state is HomeLoaded) {
-            // Aquí podrías mostrar un confetti o mensaje de éxito si la lista creció
+            // Aquí podrías mostrar un confetti
           }
         },
         builder: (context, state) {
@@ -96,7 +107,6 @@ class _HomeViewState extends State<_HomeView> {
             return const Center(child: CircularProgressIndicator(color: AppTheme.teal));
           } else if (state is HomeLoaded) {
             if (state.documents.isEmpty) {
-              // También envolvemos el estado vacío en RefreshIndicator por si acaso
               return RefreshIndicator(
                 onRefresh: () async {
                   context.read<HomeBloc>().add(LoadDocuments());
@@ -111,19 +121,16 @@ class _HomeViewState extends State<_HomeView> {
               );
             }
             
-            // --- AQUÍ ESTÁ EL CAMBIO PRINCIPAL: RefreshIndicator ---
             return RefreshIndicator(
               color: AppTheme.teal,
               backgroundColor: Colors.white,
               onRefresh: () async {
-                // Disparamos el evento de recarga al BLoC
                 context.read<HomeBloc>().add(LoadDocuments());
-                // Esperamos un poco para que la animación se vea fluida (opcional)
                 await Future.delayed(const Duration(milliseconds: 500));
               },
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
-                physics: const AlwaysScrollableScrollPhysics(), // Necesario para que funcione el scroll hacia abajo
+                physics: const AlwaysScrollableScrollPhysics(),
                 itemCount: state.documents.length,
                 itemBuilder: (context, index) {
                   final doc = state.documents[index];
@@ -147,7 +154,6 @@ class _HomeViewState extends State<_HomeView> {
 
   Widget _buildWorldCard(BuildContext context, DocumentEntity doc) {
     final isProcessing = doc.status == 'processing';
-    // Si está procesando, progreso bajo. Si está listo (ready), 0% inicial.
     final progress = isProcessing ? 0.05 : 0.0; 
 
     return Card(
@@ -163,7 +169,6 @@ class _HomeViewState extends State<_HomeView> {
               );
             }
           : () {
-              // Navegamos al mapa pasando el ID real del documento
               Navigator.push(
                 context,
                 MaterialPageRoute(

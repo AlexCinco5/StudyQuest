@@ -8,6 +8,7 @@ abstract class AuthRemoteDataSource {
   Future<UserModel> registerWithEmail(String email, String password, String username);
   Future<void> logout();
   Future<void> addXp(int amount); // <--- NUEVO
+  Future<Map<String, dynamic>> getCurrentProfile();
 }
 
 // Implementación Real
@@ -15,7 +16,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final SupabaseClient supabaseClient;
 
   AuthRemoteDataSourceImpl({required this.supabaseClient});
+  @override
+  Future<Map<String, dynamic>> getCurrentProfile() async {
+    final user = supabaseClient.auth.currentUser;
+    if (user == null) throw Exception("No hay sesión");
 
+    final response = await supabaseClient
+        .from('profiles')
+        .select()
+        .eq('id', user.id)
+        .single(); 
+
+    return response;
+  }
+  
   @override
   Future<UserModel> loginWithEmail(String email, String password) async {
     try {

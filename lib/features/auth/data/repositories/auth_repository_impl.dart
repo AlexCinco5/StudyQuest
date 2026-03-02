@@ -3,6 +3,7 @@ import '../../../../core/errors/failures.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
+import '../../domain/entities/profile_entity.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthRemoteDataSource remoteDataSource;
@@ -57,6 +58,20 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (e) {
       print("Error sumando XP: $e");
       // No lanzamos error para no interrumpir la UI de "Felicidades"
+    }
+  }
+
+  @override
+  Future<Either<Failure, ProfileEntity>> getCurrentProfile() async {
+    try {
+      // Llamamos al remoteDataSource que definimos antes
+      final data = await remoteDataSource.getCurrentProfile();
+      
+      // Convertimos el JSON (Map) a nuestra entidad pura de Dart
+      return Right(ProfileEntity.fromMap(data));
+    } catch (e) {
+      // Si algo falla, atrapamos el error al estilo dartz
+      return Left(ServerFailure(e.toString()));
     }
   }
 }
