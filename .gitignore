@@ -39,6 +39,9 @@ build/
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 
+# Ignorar archivo de credenciales
+lib/core/secrets.dart
+
 # --- PYTHON & BACKEND ---
 __pycache__/
 *.py[cod]
