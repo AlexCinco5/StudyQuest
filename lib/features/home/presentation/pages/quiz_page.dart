@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart'; 
+import 'package:flutter_tts/flutter_tts.dart'; // <--- IMPORTAMOS TTS
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/reactive_avatar.dart'; 
 import '../../../../injection_container.dart' as di;
@@ -33,16 +34,34 @@ class _QuizPageState extends State<QuizPage> {
   AvatarReaction _currentReaction = AvatarReaction.idle;
   bool _showAvatarPopUp = false; 
   late ConfettiController _confettiController;
+  
+  // --- INICIALIZAMOS EL MOTOR DE VOZ ---
+  final FlutterTts _flutterTts = FlutterTts();
 
   @override
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _initTts(); // Configuramos la voz al iniciar
     _loadQuizzes();
+  }
+
+  // --- CONFIGURACIÓN DE VOZ ---
+  Future<void> _initTts() async {
+    await _flutterTts.setLanguage("es-MX"); // Español de México
+    await _flutterTts.setSpeechRate(0.5);   // Velocidad normal/agradable
+    await _flutterTts.setVolume(1.0);       // Volumen al máximo
+    await _flutterTts.setPitch(1.0);        // Tono natural
+  }
+
+  // --- FUNCIÓN PARA HABLAR ---
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
   }
 
   @override
   void dispose() {
+    _flutterTts.stop(); // Detenemos la voz si el usuario sale de la pantalla
     _confettiController.dispose();
     super.dispose();
   }
@@ -75,6 +94,9 @@ class _QuizPageState extends State<QuizPage> {
       _showAvatarPopUp = true; 
     });
 
+    // Si quieres que la IA lea la explicación al responder, descomenta esta línea:
+    // _speak(currentQ.explanation);
+
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
         setState(() {
@@ -86,6 +108,7 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   void _nextQuestion() {
+    _flutterTts.stop(); // Callamos a la voz al pasar a la siguiente pregunta
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
@@ -99,12 +122,9 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  void _showCompletionDialog() async{
+  void _showCompletionDialog() async {
     di.sl<AuthRepository>().addXp(20);
-    
-    // --- MARCAR NIVEL COMO COMPLETADO EN DB ---
     await di.sl<LevelRepository>().markLevelCompleted(widget.topicId);
-
     _confettiController.play();
 
     showDialog(
@@ -150,6 +170,7 @@ class _QuizPageState extends State<QuizPage> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
+                _flutterTts.stop();
                 Navigator.pop(context); 
                 Navigator.pop(context); 
               },
@@ -190,7 +211,6 @@ class _QuizPageState extends State<QuizPage> {
       body: Stack(
         alignment: Alignment.topCenter,
         children: [
-          
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -207,9 +227,34 @@ class _QuizPageState extends State<QuizPage> {
                           style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          currentQ.question,
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        
+                        // --- AQUÍ ESTÁ EL DISEÑO ESTILO DUOLINGO (Texto + Bocina) ---
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[200]!, width: 2),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Botón de bocina
+                              IconButton(
+                                onPressed: () => _speak(currentQ.question),
+                                icon: const Icon(Icons.volume_up_rounded, size: 32, color: AppTheme.teal),
+                                tooltip: "Escuchar pregunta",
+                              ),
+                              const SizedBox(width: 12),
+                              // Texto de la pregunta
+                              Expanded(
+                                child: Text(
+                                  currentQ.question,
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 30),
 

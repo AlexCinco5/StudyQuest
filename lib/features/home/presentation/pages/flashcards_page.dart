@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart'; // <--- IMPORTAMOS TTS
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart' as di;
 import '../../domain/entities/flashcard_entity.dart';
@@ -29,9 +30,13 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
   late AnimationController _controller;
   late Animation<double> _animation;
 
+  // --- MOTOR TTS ---
+  final FlutterTts _flutterTts = FlutterTts();
+
   @override
   void initState() {
     super.initState();
+    _initTts();
     _loadCards();
     
     _controller = AnimationController(
@@ -41,8 +46,21 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     _animation = Tween<double>(begin: 0, end: pi).animate(_controller);
   }
 
+  // --- CONFIGURACIÓN DE VOZ ---
+  Future<void> _initTts() async {
+    await _flutterTts.setLanguage("es-MX"); 
+    await _flutterTts.setSpeechRate(0.5);   
+    await _flutterTts.setVolume(1.0);       
+    await _flutterTts.setPitch(1.0);        
+  }
+
+  Future<void> _speak(String text) async {
+    await _flutterTts.speak(text);
+  }
+
   @override
   void dispose() {
+    _flutterTts.stop(); // Apagar voz al salir
     _controller.dispose();
     super.dispose();
   }
@@ -60,6 +78,7 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     }
   }
 
+  // --- LÓGICA MODIFICADA PARA HABLAR AL VOLTEAR ---
   void _flipCard() {
     if (_controller.isAnimating) return;
     
@@ -69,12 +88,17 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     
     if (_showBack) {
       _controller.forward();
+      // ¡Magia! Lee la parte de atrás automáticamente
+      _speak(_cards[_currentIndex].back); 
     } else {
       _controller.reverse();
+      // Si la volvemos a esconder, que se calle
+      _flutterTts.stop(); 
     }
   }
 
   void _nextCard() {
+    _flutterTts.stop(); // Callamos a la voz al cambiar de tarjeta
     if (_currentIndex < _cards.length - 1) {
       setState(() {
         _currentIndex++;
@@ -86,10 +110,8 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     }
   }
 
-  void _showCompletionDialog() async{
+  void _showCompletionDialog() async {
     di.sl<AuthRepository>().addXp(10); 
-    
-    // --- MARCAR NIVEL COMO COMPLETADO EN DB ---
     await di.sl<LevelRepository>().markLevelCompleted(widget.topicId);
 
     showDialog(
