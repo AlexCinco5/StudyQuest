@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart'; // <--- IMPORTAMOS TTS
 import '../../../../core/theme/app_theme.dart';
@@ -22,9 +23,11 @@ class FlashcardsPage extends StatefulWidget {
 }
 
 class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProviderStateMixin {
-  List<FlashcardEntity> _cards = [];
+  // Usamos Queue en lugar de List para el sistema Anki (Repetición Espaciada)
+  final Queue<FlashcardEntity> _cardsQueue = Queue();
+  int _totalInitialCards = 0;
+  
   bool _isLoading = true;
-  int _currentIndex = 0;
   bool _showBack = false; 
   
   late AnimationController _controller;
@@ -43,7 +46,9 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _animation = Tween<double>(begin: 0, end: pi).animate(_controller);
+    _animation = Tween<double>(begin: 0, end: pi).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
   }
 
   // --- CONFIGURACIÓN DE VOZ ---
@@ -60,7 +65,7 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
 
   @override
   void dispose() {
-    _flutterTts.stop(); // Apagar voz al salir
+    _flutterTts.stop(); 
     _controller.dispose();
     super.dispose();
   }
@@ -69,7 +74,8 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     try {
       final cards = await di.sl<LevelRepository>().getFlashcards(widget.documentId, widget.topicId);
       setState(() {
-        _cards = cards;
+        _cardsQueue.addAll(cards);
+        _totalInitialCards = cards.length;
         _isLoading = false;
       });
     } catch (e) {
@@ -78,7 +84,6 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     }
   }
 
-  // --- LÓGICA MODIFICADA PARA HABLAR AL VOLTEAR ---
   void _flipCard() {
     if (_controller.isAnimating) return;
     
@@ -89,30 +94,48 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     if (_showBack) {
       _controller.forward();
       // ¡Magia! Lee la parte de atrás automáticamente
-      _speak(_cards[_currentIndex].back); 
+      _speak(_cardsQueue.first.back); 
     } else {
       _controller.reverse();
-      // Si la volvemos a esconder, que se calle
       _flutterTts.stop(); 
     }
   }
 
-  void _nextCard() {
-    _flutterTts.stop(); // Callamos a la voz al cambiar de tarjeta
-    if (_currentIndex < _cards.length - 1) {
-      setState(() {
-        _currentIndex++;
-        _showBack = false; 
-      });
-      _controller.reset();
-    } else {
+  // --- LÓGICA DE APRENDIZAJE (SPACED REPETITION) ---
+
+  void _markAsLearned() {
+    _flutterTts.stop();
+    // La aprendió: La sacamos definitivamente de la fila
+    _cardsQueue.removeFirst();
+    _moveToNextCard();
+  }
+
+  void _markForReview() {
+    _flutterTts.stop();
+    // Necesita repaso: La sacamos y la mandamos AL FINAL de la fila
+    final currentCard = _cardsQueue.removeFirst();
+    _cardsQueue.addLast(currentCard);
+    _moveToNextCard();
+  }
+
+  void _moveToNextCard() {
+    if (_cardsQueue.isEmpty) {
       _showCompletionDialog();
+      return;
     }
+
+    // Volteamos la carta súper rápido sin que se note para preparar la siguiente
+    _controller.value = 0;
+    setState(() {
+      _showBack = false;
+    });
   }
 
   void _showCompletionDialog() async {
     di.sl<AuthRepository>().addXp(10); 
     await di.sl<LevelRepository>().markLevelCompleted(widget.topicId);
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
@@ -153,14 +176,17 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_cards.isEmpty) {
+    if (_cardsQueue.isEmpty && _totalInitialCards == 0) {
       return Scaffold(
         appBar: AppBar(),
         body: const Center(child: Text("No hay flashcards disponibles para este tema.")),
       );
     }
 
-    final progress = (_currentIndex + 1) / _cards.length;
+    // Calculamos el progreso basado en cuántas cartas se han ELIMINADO de la cola
+    final int cardsLeft = _cardsQueue.length;
+    final int cardsLearned = _totalInitialCards - cardsLeft;
+    final double progress = (_totalInitialCards > 0) ? (cardsLearned / _totalInitialCards).clamp(0.0, 1.0) : 0.0;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -177,7 +203,7 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
         child: Column(
           children: [
             Text(
-              "${_currentIndex + 1} / ${_cards.length}",
+              "Restantes: $cardsLeft",
               style: TextStyle(
                 fontSize: 18, 
                 fontWeight: FontWeight.bold, 
@@ -192,29 +218,26 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
                 child: AnimatedBuilder(
                   animation: _animation,
                   builder: (context, child) {
-                    final isUnder = _animation.value > pi / 2;
-                    final rotation = isUnder ? _animation.value - pi : _animation.value;
-                    
+                    final angle = _animation.value;
+                    // Detectamos si la tarjeta pasó la mitad del giro (90 grados)
+                    final isFront = angle < (pi / 2);
+
+                    // Aquí está el truco REAL para evitar el espejo:
+                    // Si estamos viendo la parte de atrás, giramos el contenedor entero
+                    // usando una rotación inversa (-pi) para cancelar el espejo
+                    final transform = Matrix4.identity()
+                      ..setEntry(3, 2, 0.001) // Perspectiva 3D
+                      ..rotateY(isFront ? angle : angle - pi);
+
                     return Transform(
                       alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.001) 
-                        ..rotateY(rotation),
-                      child: isUnder 
-                          ? Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()..rotateY(pi),
-                              child: _buildCardFace(
-                                text: _cards[_currentIndex].back, 
-                                isFront: false,
-                                color: Colors.indigo[50]!,
-                              ),
-                            )
-                          : _buildCardFace(
-                              text: _cards[_currentIndex].front, 
-                              isFront: true,
-                              color: Colors.white,
-                            ),
+                      transform: transform,
+                      child: _buildCardFace(
+                        // Dependiendo del ángulo, mandamos el texto de enfrente o el de atrás
+                        text: isFront ? _cardsQueue.first.front : _cardsQueue.first.back,
+                        isFront: isFront,
+                        color: isFront ? Colors.white : Colors.indigo[50]!,
+                      ),
                     );
                   },
                 ),
@@ -231,12 +254,8 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildActionButton(Icons.close, Colors.red[400]!, "Repasar", () {
-                      _nextCard(); 
-                    }),
-                    _buildActionButton(Icons.check, Colors.green[500]!, "Lo sé", () {
-                      _nextCard();
-                    }),
+                    _buildActionButton(Icons.close, Colors.red[400]!, "Repasar", _markForReview),
+                    _buildActionButton(Icons.check, Colors.green[500]!, "Lo sé", _markAsLearned),
                   ],
                 ),
               ),

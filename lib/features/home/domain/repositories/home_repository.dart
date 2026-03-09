@@ -9,4 +9,6 @@ abstract class HomeRepository {
   
   // Subir un nuevo PDF
   Future<Either<Failure, DocumentEntity>> uploadDocument(File file, String fileName);
+
+  Future<Either<Failure, void>> deleteDocument(String documentId);
 }

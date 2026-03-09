@@ -56,5 +56,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         },
       );
     });
+
+    // --- 3. NUEVO: ELIMINAR DOCUMENTO ---
+    on<DeleteDocumentRequested>((event, emit) async {
+      emit(HomeLoading()); // Mostramos carga mientras se elimina
+      
+      final result = await homeRepository.deleteDocument(event.documentId);
+      
+      result.fold(
+        (failure) => emit(HomeError(failure.message)),
+        (_) {
+          // Si se borró con éxito, volvemos a cargar la lista de mundos
+          add(LoadDocuments()); 
+        },
+      );
+    });
   }
 }

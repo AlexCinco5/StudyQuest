@@ -7,12 +7,16 @@ plugins {
 
 android {
     namespace = "com.example.study_quest"
+    
+    // Dejamos que Flutter decida la versión más alta necesaria (SDK 34 o 36)
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Habilitamos el desugaring para las fechas de las notificaciones
+        isCoreLibraryDesugaringEnabled = true 
     }
 
     kotlinOptions {
@@ -41,4 +45,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // La herramienta mágica que traduce el código de fechas modernas para Android
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

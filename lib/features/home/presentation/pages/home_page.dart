@@ -7,6 +7,7 @@ import '../../../../injection_container.dart' as di;
 import '../../domain/entities/document_entity.dart';
 import '../bloc/home_bloc.dart';
 import 'level_map_page.dart';
+import '../../presentation/pages/profile_page.dart'; // <--- IMPORTACIÓN ACTUALIZADA SEGÚN LA ESTRUCTURA
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -57,12 +58,47 @@ class _HomeViewState extends State<_HomeView> {
     }
   }
 
+  // --- NUEVA FUNCIÓN: POPUP PARA BORRAR MUNDO ---
+  void _showDeleteDialog(BuildContext context, DocumentEntity doc) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever_rounded, color: Colors.redAccent),
+            SizedBox(width: 10),
+            Text('Destruir Mundo'),
+          ],
+        ),
+        content: Text('¿Estás seguro de que quieres eliminar "${doc.title}"? Perderás todo el progreso, XP y niveles de este mundo. Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Cerramos el popup
+              // Llamamos al Bloc para que elimine el documento en Supabase
+              context.read<HomeBloc>().add(DeleteDocumentRequested(doc.id));
+            },
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       
-      // --- APPBAR ACTUALIZADO CON BLOCBUILDER ---
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: BlocBuilder<HomeBloc, HomeState>(
@@ -76,30 +112,47 @@ class _HomeViewState extends State<_HomeView> {
             }
 
             return AppBar(
+              automaticallyImplyLeading: false, // <--- ESTA ES LA LÍNEA MÁGICA
               title: const Text("Mis Mundos", style: TextStyle(fontWeight: FontWeight.bold)),
               centerTitle: false,
               backgroundColor: Colors.white,
               elevation: 0,
               foregroundColor: Colors.black,
               actions: [
-                _buildStatBadge(Icons.local_fire_department, streakDisplay, Colors.orange),
-                _buildStatBadge(Icons.diamond, xpDisplay, Colors.blueAccent),
-                const SizedBox(width: 16),
+                // --- EMOJIS ESTILO DUOLINGO ---
+                _buildStatBadge("🔥", streakDisplay, Colors.orange),
+                _buildStatBadge("💎", xpDisplay, Colors.blueAccent),
+                
+                // --- INTEGRACIÓN DEL BOTÓN DE PERFIL ---
+                Padding(
+                  padding: const EdgeInsets.only(right: 12.0, left: 8.0),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.grey[200],
+                      child: const Icon(Icons.person, size: 20, color: Colors.grey),
+                    ),
+                  ),
+                ),
               ],
             );
           },
         ),
       ),
       
-      // --- EL RESTO QUEDA EXACTAMENTE IGUAL ---
       body: BlocConsumer<HomeBloc, HomeState>(
         listener: (context, state) {
           if (state is HomeError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: Colors.red),
             );
-          } else if (state is HomeLoaded) {
-            // Aquí podrías mostrar un confetti
           }
         },
         builder: (context, state) {
@@ -162,14 +215,17 @@ class _HomeViewState extends State<_HomeView> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        // --- AQUÍ ESTÁ EL EVENTO ON LONG PRESS PARA BORRAR ---
+        onLongPress: isProcessing ? null : () => _showDeleteDialog(context, doc), 
         onTap: isProcessing 
           ? () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("La IA está creando tu mundo, espera un momento...")),
               );
             }
-          : () {
-              Navigator.push(
+          : () async { 
+              // --- EL TRUCO PARA ACTUALIZAR LOS DATOS AL VOLVER ---
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => LevelMapPage(
@@ -179,6 +235,11 @@ class _HomeViewState extends State<_HomeView> {
                   ),
                 ),
               );
+              
+              // Cuando el usuario regresa aquí, pedimos los datos nuevos
+              if (context.mounted) {
+                context.read<HomeBloc>().add(LoadDocuments());
+              }
             },
         child: Container(
           height: 120,
@@ -250,13 +311,13 @@ class _HomeViewState extends State<_HomeView> {
     );
   }
 
-  Widget _buildStatBadge(IconData icon, String value, Color color) {
+  Widget _buildStatBadge(String emoji, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 4),
+          Text(emoji, style: const TextStyle(fontSize: 20)), 
+          const SizedBox(width: 6),
           Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),

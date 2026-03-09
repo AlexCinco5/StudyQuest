@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/secrets.dart';
-import 'injection_container.dart' as di; // Importamos con alias
+import 'injection_container.dart' as di;
 import 'features/auth/presentation/bloc/auth_bloc.dart';
-// Crearemos esta página pronto
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/welcome_page.dart';
+import 'core/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await NotificationService.init();
   // 1. Inicializar Supabase
   await Supabase.initialize(
     url: Secrets.supabaseUrl,

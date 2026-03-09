@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import traceback
 import google.generativeai as genai
 from supabase import create_client, Client
 from pypdf import PdfReader
@@ -11,7 +12,6 @@ from dotenv import load_dotenv
 # Cargar variables del archivo .env
 load_dotenv()
 
-# CONFIGURACIÓN SEGURA
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -19,106 +19,159 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not all([SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY]):
     raise Exception("❌ Faltan variables de entorno en backend/.env")
 
-# Inicializar clientes
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-# Usamos el modelo flash normal, que es más inteligente para estructurar JSONs complejos
-model = genai.GenerativeModel('gemini-2.5-flash') 
+# Usamos gemini-2.5-flash porque es excelente siguiendo instrucciones JSON
+model = genai.GenerativeModel('gemini-2.5-flash')
 
-def extract_text_from_pdf(url):
-    print(f"   ⬇️ Descargando PDF: {url}...")
+def extract_all_text_from_pdf(url):
+    print(f"   ⬇️ Descargando PDF completo: {url}...")
     response = requests.get(url)
     if response.status_code != 200:
-        raise Exception("Error al descargar PDF")
+        raise Exception("Error al descargar PDF desde Supabase Storage")
     
     print("   📖 Leyendo PDF...")
     f = BytesIO(response.content)
     reader = PdfReader(f)
-    text = ""
-    # Leemos hasta 15 páginas para tener mejor contexto
-    for page in reader.pages[:15]: 
-        text += page.extract_text() + "\n"
-    return text
+    
+    full_text = ""
+    # Ahora leemos TODAS las páginas
+    for page in reader.pages:
+        text = page.extract_text()
+        if text:
+            full_text += text + "\n"
+            
+    return full_text
 
-def generate_syllabus_with_ai(text):
-    print("   🧠 IA Analizando estructura y temas...")
+def generate_content_for_chunk(chunk_text, chunk_index):
+    print(f"   🧠 IA Analizando bloque {chunk_index}...")
     
     prompt = f"""
-    Actúa como un profesor experto. Analiza el siguiente texto extraído de un PDF educativo:
+    Actúa como un profesor universitario riguroso. Analiza esta sección extraída de un material de estudio.
     
-    --- COMIENZO TEXTO ---
-    {text[:30000]} 
-    --- FIN TEXTO ---
+    --- COMIENZO SECCIÓN ---
+    {chunk_text} 
+    --- FIN SECCIÓN ---
     
-    Tu tarea es estructurar este texto en un curso. Extrae los temas principales (entre 2 y 4 temas dependiendo de la longitud).
+    Tu tarea es extraer los conceptos clave de esta sección específica y crear material de estudio. 
+    Dependiendo de la cantidad de información en esta sección, crea entre 1 y 3 Temas ("topics").
     
-    El formato JSON debe ser EXACTAMENTE así:
+    Reglas estrictas para el JSON:
+    1. Si no hay información relevante en este texto (ej. es un índice o bibliografía), devuelve "topics": []
+    2. Cada tema debe tener entre 3 y 5 flashcards con conceptos CRUCIALES.
+    3. Cada tema debe tener entre 2 y 4 quizzes (opción múltiple, 4 opciones).
+    4. Las opciones de los quizzes no deben ser obvias, incluye distractores creíbles.
+    5. Solo responde con el JSON puro, sin comillas Markdown de código (```json).
+    
+    Formato esperado:
     {{
-        "summary": "Un resumen general de todo el documento en 2 líneas.",
         "topics": [
             {{
-                "title": "Nombre del Tema 1",
+                "title": "Nombre del Tema (Específico, no general)",
                 "description": "Breve descripción de lo que trata este tema.",
                 "flashcards": [
-                    {{"front": "Concepto 1 del tema 1", "back": "Definición"}},
-                    {{"front": "Concepto 2 del tema 1", "back": "Definición"}},
-                    {{"front": "Concepto 3 del tema 1", "back": "Definición"}}
+                    {{"front": "Concepto o Pregunta directa", "back": "Definición clara y concisa"}}
                 ],
                 "quizzes": [
                     {{
-                        "question": "¿Pregunta sobre el tema 1?",
+                        "question": "Pregunta analítica sobre el tema",
                         "options": ["A", "B", "C", "D"],
                         "correct_index": 0,
                         "explanation": "Por qué es correcta."
-                    }},
-                    {{
-                        "question": "¿Otra pregunta sobre el tema 1?",
-                        "options": ["A", "B", "C", "D"],
-                        "correct_index": 2,
-                        "explanation": "Por qué es correcta."
                     }}
                 ]
-            }},
-            {{
-                "title": "Nombre del Tema 2",
-                "description": "Breve descripción...",
-                "flashcards": [ ... ],
-                "quizzes": [ ... ]
             }}
         ]
     }}
-    
-    Asegúrate de que cada tema tenga al menos 3 flashcards y 2 quizzes. Responde SOLO con el JSON válido, sin formato Markdown alrededor.
     """
     
-    response = model.generate_content(prompt)
     try:
+        response = model.generate_content(prompt)
+        # Limpieza robusta del JSON por si la IA añade markdown
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
+        # A veces la IA añade texto extra antes o después de las llaves
+        start_idx = clean_text.find('{')
+        end_idx = clean_text.rfind('}') + 1
+        clean_text = clean_text[start_idx:end_idx]
+        
         return json.loads(clean_text)
     except Exception as e:
-        print(f"Error parseando JSON estructural: {e}")
-        print("Respuesta cruda de IA:", response.text)
-        return None
+        print(f"     ⚠️ Advertencia: IA falló en parsear el bloque {chunk_index}: {e}")
+        return {"topics": []}
+
+# --- NUEVA FUNCIÓN PARA AUTO-NOMBRAR MUNDOS ---
+def generate_global_context(full_text):
+    print("   📝 Generando título corto y resumen global...")
+    prompt = f"""
+    Lee el inicio y el final de este documento.
+    1. Crea un título corto, épico y atractivo (máximo 4 palabras) para este "mundo" de estudio basado en el tema principal (ej. "Redes Cisco", "Ciberseguridad Básica", "Anatomía Humana").
+    2. Escribe un resumen de 2 a 3 oraciones motivadoras.
+    
+    Devuelve SOLO un JSON con este formato exacto:
+    {{
+        "short_title": "Nombre Corto del Mundo",
+        "summary": "Resumen motivador de lo que aprenderá."
+    }}
+    
+    Inicio del documento:
+    {full_text[:4000]}
+    
+    ...
+    
+    Final del documento:
+    {full_text[-4000:]}
+    """
+    try:
+        response = model.generate_content(prompt)
+        clean_text = response.text.replace("```json", "").replace("```", "").strip()
+        start_idx = clean_text.find('{')
+        end_idx = clean_text.rfind('}') + 1
+        return json.loads(clean_text[start_idx:end_idx])
+    except Exception as e:
+        print(f"Error generando contexto global: {e}")
+        return {"short_title": "Mundo Inexplorado", "summary": "Un nuevo mundo de conocimiento."}
 
 def process_document(doc):
     doc_id = doc['id']
     print(f"\n🚀 Procesando documento: {doc['title']} ({doc_id})")
     
     try:
-        # 1. Extraer texto
-        pdf_text = extract_text_from_pdf(doc['file_url'])
+        # 1. Extraer TODO el texto
+        full_text = extract_all_text_from_pdf(doc['file_url'])
         
-        # 2. Generar IA (Estructura de Temas + Contenido)
-        ai_data = generate_syllabus_with_ai(pdf_text)
-        if not ai_data or 'topics' not in ai_data:
-            raise Exception("IA no devolvió datos estructurados válidos")
+        if not full_text.strip():
+            raise Exception("El PDF parece estar vacío o ser un PDF escaneado sin OCR.")
         
-        # 3. Guardar Temas y su contenido
-        topics = ai_data['topics']
-        print(f"   📑 IA encontró {len(topics)} temas. Guardando en cascada...")
+        # 2. Generar título corto y resumen global
+        global_context = generate_global_context(full_text)
+        short_title = global_context.get("short_title", "Nuevo Mundo")
+        global_summary = global_context.get("summary", "Resumen no disponible.")
         
-        for index, topic_data in enumerate(topics):
-            # A) Insertar el Tema (Nivel)
+        # 3. CHUNKING (Dividir el texto)
+        chunk_size = 25000 
+        chunks = [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+        
+        print(f"   ✂️ Documento dividido en {len(chunks)} bloques lógicos.")
+        
+        all_topics = []
+        global_topic_index = 0
+        
+        # 4. Procesar cada trozo iterativamente
+        for i, chunk in enumerate(chunks):
+            if i > 0: time.sleep(2) 
+            
+            ai_data = generate_content_for_chunk(chunk, i + 1)
+            
+            if 'topics' in ai_data:
+                for topic in ai_data['topics']:
+                    # Solo guardamos temas que realmente tengan contenido
+                    if len(topic.get('flashcards', [])) > 0 or len(topic.get('quizzes', [])) > 0:
+                        all_topics.append(topic)
+                        
+        print(f"   📑 IA encontró un total de {len(all_topics)} temas en todo el PDF. Guardando en DB...")
+        
+        # 5. Guardar en Supabase
+        for index, topic_data in enumerate(all_topics):
             topic_response = supabase.table('topics').insert({
                 'document_id': doc_id,
                 'title': topic_data['title'],
@@ -126,55 +179,61 @@ def process_document(doc):
                 'order_index': index
             }).execute()
             
-            # Obtener el ID del tema recién creado
-            topic_id = topic_response.data[0]['id'] if hasattr(topic_response, 'data') else None
+            topic_id = topic_response.data[0]['id']
             
-            # B) Insertar Flashcards vinculadas al Documento y al Tema
             if 'flashcards' in topic_data:
+                flashcards_to_insert = []
                 for fc in topic_data['flashcards']:
-                    supabase.table('flashcards').insert({
+                    flashcards_to_insert.append({
                         'document_id': doc_id,
                         'topic_id': topic_id,
                         'front_text': fc['front'],
                         'back_text': fc['back'],
                         'mastery_level': 1
-                    }).execute()
+                    })
+                if flashcards_to_insert:
+                    supabase.table('flashcards').insert(flashcards_to_insert).execute()
             
-            # C) Insertar Quizzes vinculadas al Documento y al Tema
             if 'quizzes' in topic_data:
+                quizzes_to_insert = []
                 for q in topic_data['quizzes']:
-                    supabase.table('quizzes').insert({
+                    quizzes_to_insert.append({
                         'document_id': doc_id,
                         'topic_id': topic_id,
                         'question_text': q['question'],
                         'options': q['options'],
                         'correct_answer_index': q['correct_index'],
                         'explanation': q.get('explanation', '')
-                    }).execute()
+                    })
+                if quizzes_to_insert:
+                    supabase.table('quizzes').insert(quizzes_to_insert).execute()
                     
-            print(f"      ✓ Tema '{topic_data['title']}' guardado con su contenido.")
+            print(f"      ✓ Nivel '{topic_data['title']}' configurado.")
 
-        # 4. Actualizar Documento (Status y Resumen)
-        print("   ✅ Finalizando proceso del documento...")
+        # 6. Actualizar Documento (AHORA INCLUYE EL TITULO NUEVO)
+        print(f"   ✅ Renombrando a '{short_title}' y finalizando...")
         supabase.table('documents').update({
+            'title': short_title,
             'status': 'ready',
-            'summary_text': ai_data.get('summary', 'Resumen no generado.')
+            'summary_text': global_summary
         }).eq('id', doc_id).execute()
         
-        print("🎉 ¡Proceso completado con éxito!")
+        print("🎉 ¡Proceso completado con éxito! El mundo está listo para jugarse.")
 
     except Exception as e:
-        print(f"❌ Error procesando documento {doc_id}: {e}")
-        # Solo actualizamos el status si logramos tener el doc_id
-        supabase.table('documents').update({'status': 'error'}).eq('id', doc_id).execute()
+        print(f"❌ Error crítico procesando documento {doc_id}: {e}")
+        traceback.print_exc() 
+        try:
+            supabase.table('documents').update({'status': 'error'}).eq('id', doc_id).execute()
+        except:
+            pass
 
 def main():
-    print("🤖 StudyQuest AI Worker (V2 - Syllabus Engine) iniciado...")
-    print("Esperando documentos...")
+    print("🤖 StudyQuest AI Worker (V4 - Auto-Nombramiento) iniciado...")
+    print("Esperando documentos en la cola...")
     while True:
         try:
             response = supabase.table('documents').select("*").eq('status', 'processing').execute()
-            # Validar si hay datos en la respuesta (depende de la versión de supabase-py)
             documents = response.data if hasattr(response, 'data') else response
             
             if documents and len(documents) > 0:
@@ -183,8 +242,8 @@ def main():
             else:
                 time.sleep(5)
         except Exception as e:
-            print(f"Error general en el loop: {e}")
-            time.sleep(10) # Esperar más si hay error de conexión
+            print(f"Error de conexión en el loop principal: {e}")
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()

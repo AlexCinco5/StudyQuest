@@ -17,3 +17,12 @@ class UploadDocumentRequested extends HomeEvent {
   @override
   List<Object> get props => [file, fileName];
 }
+
+class DeleteDocumentRequested extends HomeEvent {
+  final String documentId;
+
+  const DeleteDocumentRequested(this.documentId);
+
+  @override
+  List<Object> get props => [documentId];
+}

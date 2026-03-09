@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart'; 
-import 'package:flutter_tts/flutter_tts.dart'; // <--- IMPORTAMOS TTS
+import 'package:flutter_tts/flutter_tts.dart'; 
+import 'package:audioplayers/audioplayers.dart'; // <--- NUEVO: Paquete de audio
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/reactive_avatar.dart'; 
 import '../../../../injection_container.dart' as di;
@@ -31,37 +32,52 @@ class _QuizPageState extends State<QuizPage> {
   bool _isAnswered = false;
   bool _isCorrect = false;
 
+  // --- SISTEMA DE VIDAS ---
+  int _lives = 3; 
+
   AvatarReaction _currentReaction = AvatarReaction.idle;
   bool _showAvatarPopUp = false; 
   late ConfettiController _confettiController;
   
-  // --- INICIALIZAMOS EL MOTOR DE VOZ ---
   final FlutterTts _flutterTts = FlutterTts();
+  final AudioPlayer _audioPlayer = AudioPlayer(); // <--- REPRODUCTOR DE AUDIO
 
   @override
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
-    _initTts(); // Configuramos la voz al iniciar
+    _initTts(); 
     _loadQuizzes();
   }
 
-  // --- CONFIGURACIÓN DE VOZ ---
   Future<void> _initTts() async {
-    await _flutterTts.setLanguage("es-MX"); // Español de México
-    await _flutterTts.setSpeechRate(0.5);   // Velocidad normal/agradable
-    await _flutterTts.setVolume(1.0);       // Volumen al máximo
-    await _flutterTts.setPitch(1.0);        // Tono natural
+    await _flutterTts.setLanguage("es-MX"); 
+    await _flutterTts.setSpeechRate(0.5);   
+    await _flutterTts.setVolume(1.0);       
+    await _flutterTts.setPitch(1.0);        
   }
 
-  // --- FUNCIÓN PARA HABLAR ---
   Future<void> _speak(String text) async {
     await _flutterTts.speak(text);
   }
 
+  // Reproductor de efectos de sonido
+  Future<void> _playSound(bool isCorrect) async {
+    try {
+      if (isCorrect) {
+        await _audioPlayer.play(AssetSource('sounds/correct.mp3'));
+      } else {
+        await _audioPlayer.play(AssetSource('sounds/wrong.mp3'));
+      }
+    } catch (e) {
+      print("Error reproduciendo audio: $e (Asegúrate de agregar los mp3 a assets/sounds/)");
+    }
+  }
+
   @override
   void dispose() {
-    _flutterTts.stop(); // Detenemos la voz si el usuario sale de la pantalla
+    _flutterTts.stop(); 
+    _audioPlayer.dispose(); // Limpiamos el audio de la memoria
     _confettiController.dispose();
     super.dispose();
   }
@@ -94,11 +110,23 @@ class _QuizPageState extends State<QuizPage> {
       _showAvatarPopUp = true; 
     });
 
-    // Si quieres que la IA lea la explicación al responder, descomenta esta línea:
-    // _speak(currentQ.explanation);
+    // Reproducir sonido de éxito o fracaso
+    _playSound(isCorrectNow);
+
+    // Lógica de vidas
+    if (!isCorrectNow) {
+      setState(() {
+        _lives--;
+      });
+      
+      if (_lives <= 0) {
+        _showGameOverDialog();
+        return; // Detenemos aquí, el usuario perdió
+      }
+    }
 
     Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
+      if (mounted && _lives > 0) {
         setState(() {
           _showAvatarPopUp = false;
           _currentReaction = AvatarReaction.idle; 
@@ -108,7 +136,7 @@ class _QuizPageState extends State<QuizPage> {
   }
 
   void _nextQuestion() {
-    _flutterTts.stop(); // Callamos a la voz al pasar a la siguiente pregunta
+    _flutterTts.stop(); 
     if (_currentIndex < _questions.length - 1) {
       setState(() {
         _currentIndex++;
@@ -120,6 +148,43 @@ class _QuizPageState extends State<QuizPage> {
     } else {
       _showCompletionDialog();
     }
+  }
+
+  // --- NUEVO: DIALOGO DE DERROTA ---
+  void _showGameOverDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("¡Te quedaste sin vidas! 💔", textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ReactiveAvatar(reaction: AvatarReaction.fail, size: 120),
+            const SizedBox(height: 16),
+            const Text("No te desanimes. Repasa los apuntes y vuelve a intentarlo.", textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                _flutterTts.stop();
+                Navigator.pop(context); // Cierra popup
+                Navigator.pop(context); // Regresa al mapa
+              },
+              child: const Text("Terminar Intento"),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showCompletionDialog() async {
@@ -201,8 +266,24 @@ class _QuizPageState extends State<QuizPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Prueba Rápida"),
+        title: const Text("Prueba Rápida", style: TextStyle(fontSize: 18)),
         centerTitle: true,
+        actions: [
+          // --- NUEVO: BARRA DE CORAZONES ---
+          Row(
+            children: List.generate(3, (index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: Icon(
+                  index < _lives ? Icons.favorite : Icons.favorite_border,
+                  color: Colors.redAccent,
+                  size: 26,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(width: 16),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(6),
           child: LinearProgressIndicator(value: progress, color: AppTheme.teal),
@@ -228,7 +309,6 @@ class _QuizPageState extends State<QuizPage> {
                         ),
                         const SizedBox(height: 16),
                         
-                        // --- AQUÍ ESTÁ EL DISEÑO ESTILO DUOLINGO (Texto + Bocina) ---
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -239,14 +319,12 @@ class _QuizPageState extends State<QuizPage> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Botón de bocina
                               IconButton(
                                 onPressed: () => _speak(currentQ.question),
                                 icon: const Icon(Icons.volume_up_rounded, size: 32, color: AppTheme.teal),
                                 tooltip: "Escuchar pregunta",
                               ),
                               const SizedBox(width: 12),
-                              // Texto de la pregunta
                               Expanded(
                                 child: Text(
                                   currentQ.question,
@@ -268,7 +346,7 @@ class _QuizPageState extends State<QuizPage> {
                   ),
                 ),
 
-                if (_isAnswered)
+                if (_isAnswered && _lives > 0)
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
