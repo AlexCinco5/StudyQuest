@@ -9,12 +9,12 @@ import '../../../auth/domain/repositories/auth_repository.dart';
 
 class QuizPage extends StatefulWidget {
   final String documentId;
-  final String topicId; // <--- NUEVO
+  final String topicId; 
 
   const QuizPage({
     super.key, 
     required this.documentId, 
-    required this.topicId, // <--- NUEVO
+    required this.topicId, 
   });
 
   @override
@@ -99,8 +99,12 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  void _showCompletionDialog() {
+  void _showCompletionDialog() async{
     di.sl<AuthRepository>().addXp(20);
+    
+    // --- MARCAR NIVEL COMO COMPLETADO EN DB ---
+    await di.sl<LevelRepository>().markLevelCompleted(widget.topicId);
+
     _confettiController.play();
 
     showDialog(
@@ -192,7 +196,6 @@ class _QuizPageState extends State<QuizPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // --- ZONA ARRIBA: PREGUNTA Y OPCIONES (SCROLLABLE) ---
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
@@ -220,7 +223,6 @@ class _QuizPageState extends State<QuizPage> {
                   ),
                 ),
 
-                // --- ZONA ABAJO: FEEDBACK Y BOTÓN (FIJA) ---
                 if (_isAnswered)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -280,7 +282,6 @@ class _QuizPageState extends State<QuizPage> {
             ),
           ),
 
-          // --- POP-UP AVATAR ---
           IgnorePointer(
             ignoring: !_showAvatarPopUp,
             child: Container(
@@ -312,7 +313,6 @@ class _QuizPageState extends State<QuizPage> {
             ),
           ),
 
-          // --- CONFETTI ---
           ConfettiWidget(
             confettiController: _confettiController,
             blastDirectionality: BlastDirectionality.explosive,

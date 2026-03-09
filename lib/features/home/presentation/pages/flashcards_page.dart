@@ -8,12 +8,12 @@ import '../../../auth/domain/repositories/auth_repository.dart';
 
 class FlashcardsPage extends StatefulWidget {
   final String documentId;
-  final String topicId; // <--- NUEVO
+  final String topicId; 
 
   const FlashcardsPage({
     super.key, 
     required this.documentId, 
-    required this.topicId, // <--- NUEVO
+    required this.topicId, 
   });
 
   @override
@@ -86,8 +86,11 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     }
   }
 
-  void _showCompletionDialog() {
+  void _showCompletionDialog() async{
     di.sl<AuthRepository>().addXp(10); 
+    
+    // --- MARCAR NIVEL COMO COMPLETADO EN DB ---
+    await di.sl<LevelRepository>().markLevelCompleted(widget.topicId);
 
     showDialog(
       context: context,

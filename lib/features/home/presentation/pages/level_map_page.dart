@@ -83,7 +83,7 @@ class LevelMapPage extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 40),
-      itemCount: levels.length + 1, // +1 para la meta final
+      itemCount: levels.length + 1, 
       itemBuilder: (context, index) {
         if (index == levels.length) {
           // Meta Final (Cofre)
@@ -147,23 +147,26 @@ class LevelMapPage extends StatelessWidget {
                           const SnackBar(content: Text("Completa el nivel anterior para desbloquear este.")),
                         );
                       }
-                    : () {
-                        // --- LÓGICA DE NAVEGACIÓN ---
-                        // Pasamos el level.id como topicId a las pantallas
+                    : () async { // --- LÓGICA DE NAVEGACIÓN ACTUALIZADA ---
                         if (level.type == LevelType.flashcards) {
-                          Navigator.push(
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => FlashcardsPage(documentId: documentId, topicId: level.id),
                             ),
                           );
                         } else if (level.type == LevelType.quiz) {
-                          Navigator.push(
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => QuizPage(documentId: documentId, topicId: level.id),
                             ),
                           );
+                        }
+                        
+                        // Recargar niveles cuando regreses a esta pantalla
+                        if (context.mounted) {
+                          context.read<LevelBloc>().add(LoadLevels(documentId));
                         }
                       },
                 child: Container(
