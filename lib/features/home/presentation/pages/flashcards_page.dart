@@ -8,8 +8,13 @@ import '../../../auth/domain/repositories/auth_repository.dart';
 
 class FlashcardsPage extends StatefulWidget {
   final String documentId;
+  final String topicId; // <--- NUEVO
 
-  const FlashcardsPage({super.key, required this.documentId});
+  const FlashcardsPage({
+    super.key, 
+    required this.documentId, 
+    required this.topicId, // <--- NUEVO
+  });
 
   @override
   State<FlashcardsPage> createState() => _FlashcardsPageState();
@@ -19,7 +24,7 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
   List<FlashcardEntity> _cards = [];
   bool _isLoading = true;
   int _currentIndex = 0;
-  bool _showBack = false; // ¿Estamos viendo la respuesta?
+  bool _showBack = false; 
   
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -44,40 +49,44 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
 
   Future<void> _loadCards() async {
     try {
-      final cards = await di.sl<LevelRepository>().getFlashcards(widget.documentId);
+      final cards = await di.sl<LevelRepository>().getFlashcards(widget.documentId, widget.topicId);
       setState(() {
         _cards = cards;
         _isLoading = false;
       });
     } catch (e) {
-      print("Error cargando cartas: $e");
+      print("Error cargando flashcards: $e");
       setState(() => _isLoading = false);
     }
   }
 
   void _flipCard() {
+    if (_controller.isAnimating) return;
+    
+    setState(() {
+      _showBack = !_showBack;
+    });
+    
     if (_showBack) {
-      _controller.reverse();
-    } else {
       _controller.forward();
+    } else {
+      _controller.reverse();
     }
-    setState(() => _showBack = !_showBack);
   }
 
   void _nextCard() {
     if (_currentIndex < _cards.length - 1) {
-      _controller.reset();
       setState(() {
         _currentIndex++;
-        _showBack = false;
+        _showBack = false; 
       });
+      _controller.reset();
     } else {
       _showCompletionDialog();
     }
   }
 
   void _showCompletionDialog() {
-    // 1. Sumar XP en segundo plano
     di.sl<AuthRepository>().addXp(10); 
 
     showDialog(
@@ -92,10 +101,10 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.bolt, color: Colors.orange),
-                SizedBox(width: 8),
-                Text("+10 XP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange)),
+              children: [
+                const Icon(Icons.bolt, color: Colors.orange),
+                const SizedBox(width: 8),
+                const Text("+10 XP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.orange)),
               ],
             )
           ],
@@ -106,7 +115,7 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
               Navigator.pop(context); 
               Navigator.pop(context); 
             },
-            child: const Text("Genial"),
+            child: const Text("Volver al Mapa"),
           ),
         ],
       ),
@@ -122,131 +131,130 @@ class _FlashcardsPageState extends State<FlashcardsPage> with SingleTickerProvid
     if (_cards.isEmpty) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text("No hay cartas disponibles.")),
+        body: const Center(child: Text("No hay flashcards disponibles para este tema.")),
       );
     }
 
-    final currentCard = _cards[_currentIndex];
     final progress = (_currentIndex + 1) / _cards.length;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("Conceptos Clave"),
+        title: const Text("Repaso Rápido"),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(6),
           child: LinearProgressIndicator(value: progress, color: AppTheme.teal),
         ),
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 40),
-          Text(
-            "Carta ${_currentIndex + 1} de ${_cards.length}",
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
-          ),
-          const SizedBox(height: 20),
-          
-          // --- ÁREA DE LA TARJETA ---
-          Expanded(
-            child: Center(
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Column(
+          children: [
+            Text(
+              "${_currentIndex + 1} / ${_cards.length}",
+              style: TextStyle(
+                fontSize: 18, 
+                fontWeight: FontWeight.bold, 
+                color: Colors.grey[600]
+              ),
+            ),
+            const SizedBox(height: 40),
+            
+            Expanded(
               child: GestureDetector(
                 onTap: _flipCard,
                 child: AnimatedBuilder(
                   animation: _animation,
                   builder: (context, child) {
-                    final angle = _animation.value;
-                    final isFront = angle < pi / 2;
+                    final isUnder = _animation.value > pi / 2;
+                    final rotation = isUnder ? _animation.value - pi : _animation.value;
                     
                     return Transform(
-                      transform: Matrix4.identity()
-                        ..setEntry(3, 2, 0.001)
-                        ..rotateY(angle),
                       alignment: Alignment.center,
-                      child: isFront
-                          ? _buildCardFace(currentCard.front, isFront: true)
-                          : Transform(
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.001) 
+                        ..rotateY(rotation),
+                      child: isUnder 
+                          ? Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.identity()..rotateY(pi),
-                              child: _buildCardFace(currentCard.back, isFront: false),
+                              child: _buildCardFace(
+                                text: _cards[_currentIndex].back, 
+                                isFront: false,
+                                color: Colors.indigo[50]!,
+                              ),
+                            )
+                          : _buildCardFace(
+                              text: _cards[_currentIndex].front, 
+                              isFront: true,
+                              color: Colors.white,
                             ),
                     );
                   },
                 ),
               ),
             ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // --- CONTROLES ---
-          // Usamos un Container con altura fija para evitar saltos en la UI
-          SizedBox(
-            height: 100,
-            child: _showBack
-              ? Row(
+            
+            const SizedBox(height: 40),
+            
+            AnimatedOpacity(
+              opacity: _showBack ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                ignoring: !_showBack,
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildActionButton(Icons.refresh, Colors.orange, "Repasar", _nextCard),
-                    _buildActionButton(Icons.check, Colors.green, "Lo sabía", _nextCard),
+                    _buildActionButton(Icons.close, Colors.red[400]!, "Repasar", () {
+                      _nextCard(); 
+                    }),
+                    _buildActionButton(Icons.check, Colors.green[500]!, "Lo sé", () {
+                      _nextCard();
+                    }),
                   ],
-                )
-              : const Center(
-                  child: Text(
-                    "Toca la carta para ver la respuesta",
-                    style: TextStyle(color: Colors.grey),
-                  ),
                 ),
-          ),
-          const SizedBox(height: 40),
-        ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCardFace(String text, {required bool isFront}) {
+  Widget _buildCardFace({required String text, required bool isFront, required Color color}) {
     return Container(
-      width: 320, // Un poco más ancho
-      height: 450, // Un poco más alto
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
+        color: color,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 15, spreadRadius: 2, offset: Offset(0, 8)),
         ],
-        border: isFront ? null : Border.all(color: AppTheme.teal, width: 2),
       ),
+      padding: const EdgeInsets.all(30),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            isFront ? Icons.help_outline : Icons.lightbulb,
-            size: 40,
-            color: isFront ? AppTheme.darkBlue : AppTheme.teal,
-          ),
-          const SizedBox(height: 20),
+          if (!isFront) ...[
+            Text(
+              "RESPUESTA",
+              style: TextStyle(color: AppTheme.teal.withOpacity(0.7), letterSpacing: 1.5, fontSize: 12),
+            ),
+            const SizedBox(height: 20),
+          ],
           
-          // --- CORRECCIÓN DE OVERFLOW ---
-          // Usamos Expanded + SingleChildScrollView para que el texto sea deslizable
-          // si es demasiado largo.
           Expanded(
             child: Center(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(), // Efecto de rebote al scrollear
+                physics: const BouncingScrollPhysics(), 
                 child: Text(
                   text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 20, // Letra un poco más legible
+                    fontSize: 20, 
                     fontWeight: isFront ? FontWeight.bold : FontWeight.normal,
                     color: Colors.black87,
-                    height: 1.4, // Mejor interlineado para lectura
+                    height: 1.4, 
                   ),
                 ),
               ),

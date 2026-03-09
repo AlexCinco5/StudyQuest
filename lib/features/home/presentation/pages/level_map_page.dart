@@ -5,7 +5,7 @@ import '../../../../injection_container.dart' as di;
 import '../../domain/entities/level_entity.dart';
 import '../bloc/level_bloc.dart';
 import 'flashcards_page.dart'; 
-import 'quiz_page.dart'; // <--- NUEVO IMPORT
+import 'quiz_page.dart'; 
 
 class LevelMapPage extends StatelessWidget {
   final String documentId;
@@ -149,19 +149,19 @@ class LevelMapPage extends StatelessWidget {
                       }
                     : () {
                         // --- LÓGICA DE NAVEGACIÓN ---
+                        // Pasamos el level.id como topicId a las pantallas
                         if (level.type == LevelType.flashcards) {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => FlashcardsPage(documentId: documentId),
+                              builder: (_) => FlashcardsPage(documentId: documentId, topicId: level.id),
                             ),
                           );
                         } else if (level.type == LevelType.quiz) {
-                          // --- AQUÍ CONECTAMOS EL QUIZ ---
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => QuizPage(documentId: documentId),
+                              builder: (_) => QuizPage(documentId: documentId, topicId: level.id),
                             ),
                           );
                         }

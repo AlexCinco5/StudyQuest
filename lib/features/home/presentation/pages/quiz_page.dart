@@ -9,8 +9,13 @@ import '../../../auth/domain/repositories/auth_repository.dart';
 
 class QuizPage extends StatefulWidget {
   final String documentId;
+  final String topicId; // <--- NUEVO
 
-  const QuizPage({super.key, required this.documentId});
+  const QuizPage({
+    super.key, 
+    required this.documentId, 
+    required this.topicId, // <--- NUEVO
+  });
 
   @override
   State<QuizPage> createState() => _QuizPageState();
@@ -25,9 +30,8 @@ class _QuizPageState extends State<QuizPage> {
   bool _isAnswered = false;
   bool _isCorrect = false;
 
-  // --- NUEVAS VARIABLES PARA EL POP-UP DEL AVATAR ---
   AvatarReaction _currentReaction = AvatarReaction.idle;
-  bool _showAvatarPopUp = false; // Controla si el avatar salta a la pantalla
+  bool _showAvatarPopUp = false; 
   late ConfettiController _confettiController;
 
   @override
@@ -45,7 +49,7 @@ class _QuizPageState extends State<QuizPage> {
 
   Future<void> _loadQuizzes() async {
     try {
-      final questions = await di.sl<LevelRepository>().getQuizzes(widget.documentId);
+      final questions = await di.sl<LevelRepository>().getQuizzes(widget.documentId, widget.topicId);
       setState(() {
         _questions = questions;
         _isLoading = false;
@@ -67,17 +71,14 @@ class _QuizPageState extends State<QuizPage> {
       _isAnswered = true;
       _isCorrect = isCorrectNow;
       
-      // 1. Configuramos la reacción y HACEMOS SALTAR AL AVATAR
       _currentReaction = isCorrectNow ? AvatarReaction.success : AvatarReaction.fail;
       _showAvatarPopUp = true; 
     });
 
-    // 2. Ocultamos el avatar después de 1.5 segundos para que deje leer la explicación
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
         setState(() {
           _showAvatarPopUp = false;
-          // Lo devolvemos a idle oculto para que esté listo para la sig. pregunta
           _currentReaction = AvatarReaction.idle; 
         });
       }
@@ -91,7 +92,7 @@ class _QuizPageState extends State<QuizPage> {
         _selectedOptionIndex = null;
         _isAnswered = false;
         _isCorrect = false;
-        _showAvatarPopUp = false; // Por si acaso
+        _showAvatarPopUp = false; 
       });
     } else {
       _showCompletionDialog();
@@ -111,7 +112,6 @@ class _QuizPageState extends State<QuizPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // --- ¡EL AVATAR CELEBRA DENTRO DEL POP-UP DE RECOMPENSA! ---
             const ReactiveAvatar(
               reaction: AvatarReaction.celebrate, 
               size: 120
@@ -166,7 +166,7 @@ class _QuizPageState extends State<QuizPage> {
     if (_questions.isEmpty) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text("No hay preguntas disponibles.")),
+        body: const Center(child: Text("No hay preguntas disponibles para este tema.")),
       );
     }
 
@@ -187,29 +187,40 @@ class _QuizPageState extends State<QuizPage> {
         alignment: Alignment.topCenter,
         children: [
           
-          // --- CAPA 1: EL CONTENIDO DEL QUIZ ---
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  "Pregunta ${_currentIndex + 1} / ${_questions.length}",
-                  style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+                // --- ZONA ARRIBA: PREGUNTA Y OPCIONES (SCROLLABLE) ---
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          "Pregunta ${_currentIndex + 1} / ${_questions.length}",
+                          style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          currentQ.question,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 30),
+
+                        ...List.generate(currentQ.options.length, (index) {
+                          return _buildOptionCard(index, currentQ.options[index], currentQ.correctIndex);
+                        }),
+                        
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  currentQ.question,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 30),
 
-                ...List.generate(currentQ.options.length, (index) {
-                  return _buildOptionCard(index, currentQ.options[index], currentQ.correctIndex);
-                }),
-
-                const Spacer(),
-
+                // --- ZONA ABAJO: FEEDBACK Y BOTÓN (FIJA) ---
                 if (_isAnswered)
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -219,26 +230,35 @@ class _QuizPageState extends State<QuizPage> {
                       border: Border.all(color: _isCorrect ? Colors.green : Colors.red),
                     ),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           children: [
                             Icon(_isCorrect ? Icons.check_circle : Icons.error, 
                                  color: _isCorrect ? Colors.green : Colors.red),
                             const SizedBox(width: 8),
-                            Text(
-                              _isCorrect ? "¡Correcto!" : "Incorrecto",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _isCorrect ? Colors.green[800] : Colors.red[800],
+                            Expanded(
+                              child: Text(
+                                _isCorrect ? "¡Correcto!" : "Incorrecto",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: _isCorrect ? Colors.green[800] : Colors.red[800],
+                                ),
                               ),
                             ),
                           ],
                         ),
                         if (currentQ.explanation.isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          Text(
-                            currentQ.explanation,
-                            style: TextStyle(color: Colors.grey[800]),
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 120),
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              child: Text(
+                                currentQ.explanation,
+                                style: TextStyle(color: Colors.grey[800]),
+                              ),
+                            ),
                           ),
                         ],
                         const SizedBox(height: 12),
@@ -256,28 +276,26 @@ class _QuizPageState extends State<QuizPage> {
                       ],
                     ),
                   ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
 
-          // --- CAPA 2: POP-UP ANIMADO DEL AVATAR ---
-          // Usamos IgnorePointer para que si está invisible, no bloquee los toques
+          // --- POP-UP AVATAR ---
           IgnorePointer(
             ignoring: !_showAvatarPopUp,
             child: Container(
-              alignment: Alignment.center, // Lo centramos en la pantalla
-              margin: const EdgeInsets.only(bottom: 100), // Lo subimos un poco
+              alignment: Alignment.center, 
+              margin: const EdgeInsets.only(bottom: 100), 
               child: AnimatedOpacity(
                 opacity: _showAvatarPopUp ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 200),
                 child: AnimatedScale(
                   scale: _showAvatarPopUp ? 1.0 : 0.1,
                   duration: const Duration(milliseconds: 400),
-                  curve: Curves.elasticOut, // ¡Este es el efecto de rebote genial!
+                  curve: Curves.elasticOut, 
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withOpacity(0.95),
                       shape: BoxShape.circle,
                       boxShadow: const [
                         BoxShadow(color: Colors.black26, blurRadius: 20, spreadRadius: 5)
@@ -286,7 +304,7 @@ class _QuizPageState extends State<QuizPage> {
                     padding: const EdgeInsets.all(16),
                     child: ReactiveAvatar(
                       reaction: _currentReaction,
-                      size: 150, // ¡Más grande y protagonista!
+                      size: 150, 
                     ),
                   ),
                 ),
@@ -294,7 +312,7 @@ class _QuizPageState extends State<QuizPage> {
             ),
           ),
 
-          // --- CAPA 3: EL CAÑÓN DE CONFETTI ---
+          // --- CONFETTI ---
           ConfettiWidget(
             confettiController: _confettiController,
             blastDirectionality: BlastDirectionality.explosive,

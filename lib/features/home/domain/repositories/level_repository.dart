@@ -70,32 +70,76 @@ class LevelRepository {
     }
   }
 
-  /// Obtiene todas las flashcards de un documento.
-  Future<List<FlashcardEntity>> getFlashcards(String docId) async {
+  /// Obtiene las flashcards de un documento y tema en específico.
+  Future<List<FlashcardEntity>> getFlashcards(String docId, String topicId) async {
     try {
-      final response = await supabase
-          .from('flashcards')
-          .select()
-          .eq('document_id', docId);
+      // PLAN A: Es un PDF viejo o el topicId es genérico
+      if (topicId.startsWith('lvl_')) {
+        final response = await supabase
+            .from('flashcards')
+            .select()
+            .eq('document_id', docId);
+        
+        final List<dynamic> data = response as List<dynamic>;
+        return data.map((json) => FlashcardEntity.fromMap(json)).toList();
+      } 
+      // PLAN B: Es un PDF nuevo con temas reales
+      else {
+        final response = await supabase
+            .from('flashcards')
+            .select()
+            .eq('topic_id', topicId); // Buscamos por el tema específico
 
-      final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => FlashcardEntity.fromMap(json)).toList();
+        final List<dynamic> data = response as List<dynamic>;
+        
+        // Si no encontró nada por tema (tal vez la IA no generó flashcards para este tema en particular), 
+        // traemos todas las del documento como fallback para que no se quede vacío.
+        if (data.isEmpty) {
+           final fallbackResponse = await supabase
+            .from('flashcards')
+            .select()
+            .eq('document_id', docId);
+           final List<dynamic> fallbackData = fallbackResponse as List<dynamic>;
+           return fallbackData.map((json) => FlashcardEntity.fromMap(json)).toList();
+        }
+
+        return data.map((json) => FlashcardEntity.fromMap(json)).toList();
+      }
 
     } catch (e) {
       throw Exception('Error al obtener las flashcards: $e');
     }
   }
 
-  /// Obtiene todas las preguntas del Quiz para un documento.
-  Future<List<QuizEntity>> getQuizzes(String docId) async {
+  /// Obtiene las preguntas del Quiz para un documento y tema en específico.
+  Future<List<QuizEntity>> getQuizzes(String docId, String topicId) async {
     try {
-      final response = await supabase
-          .from('quizzes')
-          .select()
-          .eq('document_id', docId);
+      if (topicId.startsWith('lvl_')) {
+        final response = await supabase
+            .from('quizzes')
+            .select()
+            .eq('document_id', docId);
+        final List<dynamic> data = response as List<dynamic>;
+        return data.map((json) => QuizEntity.fromMap(json)).toList();
+      } else {
+        final response = await supabase
+            .from('quizzes')
+            .select()
+            .eq('topic_id', topicId);
 
-      final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => QuizEntity.fromMap(json)).toList();
+        final List<dynamic> data = response as List<dynamic>;
+        
+        if (data.isEmpty) {
+           final fallbackResponse = await supabase
+            .from('quizzes')
+            .select()
+            .eq('document_id', docId);
+           final List<dynamic> fallbackData = fallbackResponse as List<dynamic>;
+           return fallbackData.map((json) => QuizEntity.fromMap(json)).toList();
+        }
+
+        return data.map((json) => QuizEntity.fromMap(json)).toList();
+      }
     } catch (e) {
       throw Exception('Error al obtener los quizzes: $e');
     }

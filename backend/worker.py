@@ -126,26 +126,26 @@ def process_document(doc):
                 'order_index': index
             }).execute()
             
-            # Obtener el ID del tema recién creado (si no lo devuelve, lo buscamos, pero .execute() en la versión nueva de supabase-py suele devolver la data)
-            # Como supabase-py a veces devuelve data en una lista, extraemos el ID:
+            # Obtener el ID del tema recién creado
             topic_id = topic_response.data[0]['id'] if hasattr(topic_response, 'data') else None
             
-            # B) Insertar Flashcards vinculadas al Documento (Opcional: vincularlas al Tema también en el futuro)
-            # Por ahora, las vinculamos al documento como lo tenías, pero en el futuro puedes añadir 'topic_id' a tu tabla flashcards
+            # B) Insertar Flashcards vinculadas al Documento y al Tema
             if 'flashcards' in topic_data:
                 for fc in topic_data['flashcards']:
                     supabase.table('flashcards').insert({
                         'document_id': doc_id,
+                        'topic_id': topic_id,
                         'front_text': fc['front'],
                         'back_text': fc['back'],
                         'mastery_level': 1
                     }).execute()
             
-            # C) Insertar Quizzes
+            # C) Insertar Quizzes vinculadas al Documento y al Tema
             if 'quizzes' in topic_data:
                 for q in topic_data['quizzes']:
                     supabase.table('quizzes').insert({
                         'document_id': doc_id,
+                        'topic_id': topic_id,
                         'question_text': q['question'],
                         'options': q['options'],
                         'correct_answer_index': q['correct_index'],
