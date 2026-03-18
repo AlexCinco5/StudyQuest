@@ -4,6 +4,10 @@ import time
 import json
 import traceback
 
+# --- NUEVAS IMPORTACIONES PARA EL TRUCO DE RENDER ---
+from flask import Flask
+import threading
+
 # Librerías pesadas para conectarnos a la IA, a la base de datos y para leer PDFs
 import google.generativeai as genai
 from supabase import create_client, Client
@@ -283,6 +287,23 @@ def main():
             print(f"Error de conexión en el loop principal: {e}")
             time.sleep(10)
 
+# --- EL TRUCO PARA RENDER (Servidor Web Falso) ---
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "¡El trabajador de StudyQuest está vivo y funcionando!"
+
+def keep_alive():
+    # Render nos asignará un puerto automáticamente, o usamos el 8080 por defecto
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
+
 # Verificamos que este archivo se esté ejecutando directamente y arrancamos
 if __name__ == "__main__":
+    # 1. Prendemos el servidor web falso en un "hilo" paralelo para engañar a Render
+    server = threading.Thread(target=keep_alive)
+    server.start()
+    
+    # 2. Arrancamos nuestro trabajador de IA infinito
     main()
