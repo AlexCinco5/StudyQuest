@@ -29,6 +29,14 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # Seguro de vida: Si el script no encuentra las claves, se apaga para no romper nada
+# --- MODO DETECTIVE ---
+print("🔍 --- DIAGNÓSTICO DE VARIABLES EN RENDER --- 🔍")
+print(f"SUPABASE_URL detectada: {'✅ SÍ' if SUPABASE_URL else '❌ NO (¡Falta esta!)'}")
+print(f"SUPABASE_KEY detectada: {'✅ SÍ' if SUPABASE_KEY else '❌ NO (¡Falta esta!)'}")
+print(f"GEMINI_API_KEY detectada: {'✅ SÍ' if GEMINI_API_KEY else '❌ NO (¡Falta esta!)'}")
+print("--------------------------------------------------")
+
+# Seguro de vida: Si el script no encuentra las claves, se apaga para no romper nada
 if not all([SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY]):
     raise Exception("❌ Faltan contraseñas. Revisa tu archivo .env o el panel de Render.")
 
