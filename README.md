@@ -53,11 +53,3 @@ Este proyecto no es solo una cara bonita, está construido con estándares de la
 - **Backend (BaaS):** `Supabase` (PostgreSQL). Autenticación segura y almacenamiento de PDFs en la nube. ¡Tu progreso se guarda en tiempo real!
 
 ---
-
-## 🦍 Equipo
-
-Un nombre de un proyecto no estara completo si no mostramos el equipo, te presento a mi equipo:
-
-<div align="center">
-  <img src="ruta_de_tu_imagen.png" alt="Mi Equipo" width="300">
-</div>
