@@ -5,7 +5,9 @@
 
   ![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
   ![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+  ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
   ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+  ![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 
 </div>
 
@@ -44,12 +46,14 @@ Como la app es completamente nueva y la estás descargando directamente, Android
 
 ---
 
-## 🛠️ Tecnología detrás de la magia
+## 🛠️ Tecnología y Ecosistema detrás de la magia
 
-Este proyecto no es solo una cara bonita, está construido con estándares de la industria para asegurar que escale y no se trabe:
+Este proyecto no es solo una cara bonita, está construido con estándares de la industria para asegurar que escale y no se trabe. Nuestro ecosistema no se queda solo en el celular, está respaldado por una sólida arquitectura en la nube:
 
-- **Frontend:** `Flutter` & `Dart` para una interfaz fluida, nativa y animaciones 3D.
-- **Arquitectura:** `Clean Architecture` & `BLoC`. Código completamente modular, separando la interfaz de la lógica de negocio para un rendimiento impecable y libre de *spaghetti code*.
-- **Backend (BaaS):** `Supabase` (PostgreSQL). Autenticación segura y almacenamiento de PDFs en la nube. ¡Tu progreso se guarda en tiempo real!
+- **Frontend Móvil:** `Flutter` & `Dart` para una interfaz fluida, nativa y animaciones 3D.
+- **Arquitectura Limpia:** Uso de `Clean Architecture` & `BLoC`. Código completamente modular, separando la interfaz de la lógica de negocio para un rendimiento impecable y libre de *spaghetti code*.
+- **Backend y Base de Datos:** `Supabase` (PostgreSQL). Autenticación segura y almacenamiento de PDFs en la nube. Tu progreso se guarda en tiempo real.
+- **Motor de Inteligencia Artificial:** Un *worker* independiente desarrollado en `Python` y alojado en **Render**, encargado de procesar los PDFs en segundo plano y comunicarse con la API de Google Gemini.
+- **Automatización (Bot Centinela):** Implementamos un bot automatizado (UptimeRobot) que monitorea la salud de nuestro servidor de IA haciéndole "ping" constantemente. Esto asegura que el "cerebro" de la app esté despierto 24/7, listo para procesar tus apuntes a cualquier hora sin interrupciones ni tiempos de espera.
 
 ---
