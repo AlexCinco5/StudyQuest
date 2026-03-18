@@ -40,6 +40,8 @@ dependencies:
   flutter_local_notifications: ^17.1.2
   timezone: ^0.9.0
   audioplayers: ^6.6.0
+  flutter_markdown: ^0.7.7+1
+  flutter_launcher_icons: "^0.13.1"
 
 dev_dependencies:
   flutter_test:
@@ -114,3 +116,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/LAPP.png" # La ruta donde guardaste tu imagen

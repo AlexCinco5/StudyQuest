@@ -1,11 +1,15 @@
+// Importaciones base de Flutter para interfaces de usuario y el gestor de estado BLoC.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-// Importaciones de tu arquitectura
+// Importaciones internas de la arquitectura limpia de la aplicacion.
 import '../bloc/auth_bloc.dart';
-import '../../../../core/theme/app_theme.dart'; // Para usar colores específicos si hace falta
-import '../../../home/presentation/pages/home_page.dart'; // Importante para la navegación
+import '../../../../core/theme/app_theme.dart'; // Define la paleta de colores y estilos globales.
+import '../../../home/presentation/pages/home_page.dart'; // Pantalla destino tras un login exitoso.
 
+// Definicion de la pantalla de Login como un StatefulWidget.
+// Se requiere manejar estado local (Stateful) porque los campos de texto mutan 
+// constantemente conforme el usuario teclea sus credenciales.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -14,25 +18,31 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  // Controladores para capturar el texto del usuario
+  // Inicializacion de controladores para extraer el texto de los inputs.
+  // Actuan como puentes entre la UI y la logica para leer lo que el usuario escribio.
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
-  // Clave para validar el formulario (que no esté vacío, etc.)
+  // Clave global para identificar y manipular el formulario completo.
+  // Permite ejecutar validaciones conjuntas en todos los inputs antes de enviar la peticion.
   final _formKey = GlobalKey<FormState>();
 
+  // Metodo del ciclo de vida que se ejecuta al destruir la pantalla.
   @override
   void dispose() {
-    // Siempre limpia los controladores para liberar memoria
+    // Es imperativo liberar los controladores de texto para prevenir fugas de memoria (memory leaks).
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // Funcion disparada al presionar el boton principal de inicio de sesion.
   void _onLoginPressed() {
-    // 1. Validar que los campos no estén vacíos
+    // 1. Ejecuta los validadores individuales definidos en los TextFormFields.
+    // Solo si todos retornan 'null' (es decir, sin errores), se procede.
     if (_formKey.currentState!.validate()) {
-      // 2. Disparar el evento al BLoC
+      // 2. Extrae el texto, limpia espacios accidentales al inicio/final con trim(),
+      // y despacha el evento 'LoginRequested' hacia el BLoC para iniciar el proceso de autenticacion.
       context.read<AuthBloc>().add(
             LoginRequested(
               email: _emailController.text.trim(),
@@ -42,53 +52,67 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Construccion del arbol de widgets de la pantalla.
   @override
   Widget build(BuildContext context) {
-    // BlocConsumer: Escucha cambios (Listener) Y reconstruye la UI (Builder)
     return Scaffold(
+      // BlocConsumer es un widget hibrido especializado.
+      // Ejecuta logica secundaria sin redibujar (listener) Y redibuja la UI segun el estado (builder).
       body: BlocConsumer<AuthBloc, AuthState>(
+        
+        // Bloque listener: Reacciona a cambios de estado ejecutando acciones "one-off" 
+        // como navegacion, dialogos o notificaciones tipo toast/snackbar.
         listener: (context, state) {
           if (state is AuthFailure) {
-            // Error: Mostrar Snackbar Roja
+            // Manejo del estado de error: Muestra un banner rojo en la parte inferior.
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.redAccent,
-                behavior: SnackBarBehavior.floating,
+                behavior: SnackBarBehavior.floating, // Hace que el banner flote sobre la UI.
               ),
             );
           } else if (state is AuthSuccess) {
-            // Éxito: Navegar al Home y borrar el historial de navegación
+            // Manejo del estado de exito: Navega hacia la pantalla Home.
+            // Se utiliza pushReplacement para destruir la pantalla de Login del stack de navegacion,
+            // evitando que el usuario regrese accidentalmente al login presionando el boton "Atras".
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (context) => const HomePage()),
             );
           }
         },
+        
+        // Bloque builder: Reconstruye puramente la interfaz visual basandose en el estado actual.
         builder: (context, state) {
-          // Si está cargando, mostramos un indicador de progreso
+          // Intercepta el estado de carga para mostrar retroalimentacion visual (spinner).
           if (state is AuthLoading) {
             return const Center(
               child: CircularProgressIndicator(
-                color: AppTheme.teal, // Usamos tu color turquesa
+                color: AppTheme.teal, // Utiliza el color de acento definido en el tema global.
               ),
             );
           }
 
-          // Si no está cargando, mostramos el formulario
+          // Construccion de la vista por defecto (AuthInitial o tras un fallo recuperable).
           return Center(
+            // SingleChildScrollView previene errores de "RenderFlex overflow" si se despliega
+            // el teclado virtual en pantallas pequeñas, permitiendo hacer scroll vertical.
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32.0),
+              padding: const EdgeInsets.all(32.0), // Margen interno para dar respiro visual.
+              
+              // Envoltorio Form necesario para que la _formKey funcione y agrupe los inputs.
               child: Form(
                 key: _formKey,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisAlignment: MainAxisAlignment.center, // Centra los elementos verticalmente.
+                  crossAxisAlignment: CrossAxisAlignment.stretch, // Estira los botones para ocupar el ancho disponible.
                   children: [
-                    // --- LOGO Y TÍTULO ---
+                    
+                    // --- SECCION CABECERA (LOGO Y TITULOS) ---
                     const Icon(
                       Icons.school_rounded, 
                       size: 100, 
-                      color: AppTheme.darkBlue // Tu azul principal
+                      color: AppTheme.darkBlue 
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -110,16 +134,18 @@ class _LoginPageState extends State<LoginPage> {
                         color: Colors.grey[600],
                       ),
                     ),
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 48), // Espaciador grande antes del formulario.
 
                     // --- INPUT EMAIL ---
                     TextFormField(
                       controller: _emailController,
+                      // Optimiza el teclado virtual para mostrar la '@' mas accesible.
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
                         labelText: 'Correo Electrónico',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
+                      // Funcion validadora. Retorna un string de error o null si es valido.
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Por favor ingresa tu correo';
@@ -127,7 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                         if (!value.contains('@')) {
                           return 'Ingresa un correo válido';
                         }
-                        return null;
+                        return null; // Validacion exitosa.
                       },
                     ),
                     const SizedBox(height: 20),
@@ -135,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
                     // --- INPUT PASSWORD ---
                     TextFormField(
                       controller: _passwordController,
-                      obscureText: true, // Ocultar texto
+                      obscureText: true, // Oculta el texto tecleado reemplazandolo por puntos (***).
                       decoration: const InputDecoration(
                         labelText: 'Contraseña',
                         prefixIcon: Icon(Icons.lock_outline),
@@ -144,6 +170,7 @@ class _LoginPageState extends State<LoginPage> {
                         if (value == null || value.isEmpty) {
                           return 'Por favor ingresa tu contraseña';
                         }
+                        // Validacion basica de seguridad (minimo 6 caracteres suele ser requerido por Supabase).
                         if (value.length < 6) {
                           return 'La contraseña debe tener al menos 6 caracteres';
                         }
@@ -152,18 +179,19 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 32),
 
-                    // --- BOTÓN LOGIN ---
+                    // --- BOTON DE ACCION PRINCIPAL ---
+                    // Usa el FilledButtonTheme definido globalmente en app_theme.dart.
                     FilledButton(
-                      onPressed: _onLoginPressed,
+                      onPressed: _onLoginPressed, // Invoca la funcion local definida arriba.
                       child: const Text('INICIAR SESIÓN'),
                     ),
                     
                     const SizedBox(height: 16),
                     
-                    // --- ENLACE A REGISTRO (Visual por ahora) ---
+                    // --- ENLACE SECUNDARIO (NAVEGACION A REGISTRO) ---
                     TextButton(
                       onPressed: () {
-                        // Aquí conectaríamos la página de Registro más adelante
+                        // Implementacion temporal interactiva mediante un SnackBar.
                         ScaffoldMessenger.of(context).showSnackBar(
                            const SnackBar(content: Text("Función de Registro próximamente...")),
                         );
