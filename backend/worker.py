@@ -4,12 +4,12 @@ import time
 import json
 import traceback
 
-# --- NUEVAS IMPORTACIONES PARA EL TRUCO DE RENDER ---
+# --- IMPORTACIONES PARA EL TRUCO DE RENDER ---
 from flask import Flask
 import threading
 
 # Librerías pesadas para conectarnos a la IA, a la base de datos y para leer PDFs
-import google.generativeai as genai
+from google import genai # <--- ¡VERSIÓN NUEVA DE GOOGLE!
 from supabase import create_client, Client
 from pypdf import PdfReader
 from io import BytesIO
@@ -34,10 +34,8 @@ if not all([SUPABASE_URL, SUPABASE_KEY, GEMINI_API_KEY]):
 
 # Encendemos los motores de la base de datos y de la inteligencia artificial
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Usamos el modelo 'flash' porque es el más rápido y obedece muy bien el formato JSON
-model = genai.GenerativeModel('gemini-2.5-flash')
+# <--- NUEVA FORMA DE INICIAR GEMINI --->
+client = genai.Client(api_key=GEMINI_API_KEY) 
 
 # Función que toma la URL del PDF que se guardó en Supabase y le saca todo el texto
 def extract_all_text_from_pdf(url):
@@ -108,8 +106,11 @@ def generate_content_for_chunk(chunk_text, chunk_index):
     """
     
     try:
-        # Mandamos el texto a Google
-        response = model.generate_content(prompt)
+        # <--- NUEVA FORMA DE PEDIRLE DATOS A GEMINI --->
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
         
         # Limpiamos la respuesta por si la IA le pone comillas raras o formato de código
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
@@ -153,7 +154,11 @@ def generate_global_context(full_text):
     """
     
     try:
-        response = model.generate_content(prompt)
+        # <--- NUEVA FORMA DE PEDIRLE DATOS A GEMINI --->
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         start_idx = clean_text.find('{')
         end_idx = clean_text.rfind('}') + 1
